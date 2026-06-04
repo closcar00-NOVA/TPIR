@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>The Price is Right - Championship Suite v2.1</title>
+    <title>The Price is Right - Championship Suite v2.2</title>
     <style>
         :root {
             --bg-color: #0f111a;
@@ -126,7 +126,7 @@
                 <div class="stat-val" id="winningsDisplay">$0</div>
             </div>
             <div id="interactiveScoreRow">
-                <div style="font-size: 11px; text-transform: uppercase; color: var(--text-muted);" id="scoreLabelText">Current Spin Score</div>
+                <div style="font-size: 11px; text-transform: uppercase; color: var(--text-muted);">Current Spin Score</div>
                 <div class="stat-val" id="scoreDisplay" style="color: #fbbf24;">0.00</div>
             </div>
             <button id="actionBtn" style="width: 100%; margin-top: 14px; color: white; background: #ef4444;" onclick="handleMainAction()">Spin The Wheel!</button>
@@ -142,7 +142,11 @@
     let currentMode = 'WHEEL'; 
     let lifetimeWinnings = 0;
 
-    // --- The Big Wheel State & Fixed Vector Layout Maps ---
+    // --- Animation Framing Counters (FIXED GLOBAL DECLARATIONS) ---
+    let globalAnimationProgress = 0; 
+    let glowPulseFrame = 0;
+
+    // --- The Big Wheel Constants ---
     const WHEEL_VALUES = [
         0.05, 1.00, 0.15, 0.80, 0.35, 0.70, 0.25, 0.60, 0.45, 0.55,
         0.40, 0.65, 0.30, 0.75, 0.20, 0.85, 0.10, 0.95, 0.50, 0.90
@@ -159,7 +163,7 @@
     let lastMouseY = 0;
     let dragVelocity = 0;
 
-    // --- Plinko Physics Simulation Engine State ---
+    // --- Plinko Engine Constants ---
     let plinkoChips = [];
     let plinkoPegs = [];
     let plinkoRemainingDrops = 0;
@@ -174,6 +178,7 @@
         loadWinningsState();
         initBigWheelEngine();
 
+        // High frequency render interval loops
         setInterval(studioMainLoop, 30);
     };
 
@@ -217,20 +222,17 @@
 
         if (mode === 'WHEEL') {
             document.getElementById('panelStatsTitle').innerText = "Wheel Controls";
-            document.getElementById('scoreLabelText').innerText = "Current Spin Score";
             document.getElementById('actionBtn').innerText = "Spin The Wheel!";
             document.getElementById('actionBtn').style.display = 'block';
             initBigWheelEngine();
         } else if (mode === 'PLINKO') {
             document.getElementById('panelStatsTitle').innerText = "Plinko Dashboard";
-            document.getElementById('scoreLabelText').innerText = "Remaining Chips";
             document.getElementById('actionBtn').innerText = "Get Pricing Chips";
             document.getElementById('actionBtn').style.display = 'block';
             initPlinkoEngine();
         }
     }
 
-    // --- Core Architecture: The Big Wheel Execution Block ---
     function initBigWheelEngine() {
         wheelAngle = 0;
         wheelVelocity = 0;
@@ -274,11 +276,9 @@
     }
 
     function resolveFinalWheelScore() {
-        // FIXED ALIGNMENT MATH: Correct index offset calculation and flip tracking to accurately read exact pointer segment
         let normalized = (wheelAngle % (Math.PI * 2));
         if (normalized < 0) normalized += (Math.PI * 2);
 
-        // Find index relative to 12 o'clock pointer position (1.5 * Math.PI)
         let exactIndex = Math.floor((Math.PI * 1.5 - normalized) / SEGMENT_ARC) % TOTAL_SEGMENTS;
         if (exactIndex < 0) exactIndex += TOTAL_SEGMENTS;
 
@@ -299,23 +299,21 @@
             spinCount = 0; wheelTotalScore = 0;
         } else {
             if (spinCount === 1) {
-                logMessage(`Bob Barker: You're at $${wheelTotalScore.toFixed(2)}. Swipe the wheel or press Spin again to risk it, or hold your score!`, "host");
+                logMessage("Bob Barker: Swipe the wheel or press Spin again to risk it, or hold your score!", "host");
             } else {
-                logMessage(`Bob Barker: You stand on a strong final tally of $${wheelTotalScore.toFixed(2)}!`, "win");
+                logMessage(`Bob Barker: You stand on a strong final score of $${wheelTotalScore.toFixed(2)}!`, "win");
                 updateWinningsLedger(wheelTotalScore * 1000);
                 spinCount = 0; wheelTotalScore = 0;
             }
         }
     }
 
-    // --- Core Architecture: The Plinko Sub-Engine Block ---
     function initPlinkoEngine() {
         plinkoChips = [];
         plinkoPegs = [];
         plinkoRemainingDrops = 0;
         document.getElementById('scoreDisplay').innerText = "0";
 
-        // Generate alternate shifting grid layout arrays for Plinko peg coordinates
         for (let row = 0; row < 10; row++) {
             let pegsInRow = row % 2 === 0 ? 9 : 10;
             let startX = row % 2 === 0 ? 60 : 25;
@@ -351,24 +349,21 @@
         for (let i = plinkoChips.length - 1; i >= 0; i--) {
             let c = plinkoChips[i];
             
-            c.vy += 0.35; // Apply gravity pull acceleration coordinates
+            c.vy += 0.35; 
             c.x += c.vx;
             c.y += c.vy;
 
-            // Bounce wall collision boundaries
             if (c.x < 15 || c.x > 985) {
                 c.vx *= -0.6;
                 c.x = c.x < 15 ? 15 : 985;
             }
 
-            // Pin grid collision detections
             plinkoPegs.forEach(peg => {
                 let dx = c.x - peg.x;
                 let dy = c.y - peg.y;
                 let dist = Math.sqrt(dx*dx + dy*dy);
                 if (dist < c.radius + peg.radius) {
                     playSound('peg');
-                    // Push out of collision and reflect velocity vectors with scatter randomness
                     let angle = Math.atan2(dy, dx);
                     c.x = peg.x + Math.cos(angle) * (c.radius + peg.radius + 1);
                     c.y = peg.y + Math.sin(angle) * (c.radius + peg.radius + 1);
@@ -379,7 +374,6 @@
                 }
             });
 
-            // Handle landing in award bin base frames
             if (c.y > 550) {
                 let slotIdx = Math.floor(c.x / SLOT_WIDTH);
                 slotIdx = Math.max(0, Math.min(PLINKO_SLOTS.length - 1, slotIdx));
@@ -397,7 +391,6 @@
         }
     }
 
-    // --- Master Loop Tick Mapping Grid Driver ---
     function studioMainLoop() {
         glowPulseFrame += 0.08;
         if (globalAnimationProgress < 1.0) globalAnimationProgress += 0.05;
@@ -410,11 +403,9 @@
         renderStudioGraphics();
     }
 
-    // --- Canvas Presentation Layer UI Grid ---
     function renderStudioGraphics() {
         ctx.fillStyle = '#060612'; ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-        // Stage Backing Hollywood Chase border light accents
         ctx.strokeStyle = '#2563eb'; ctx.lineWidth = 4;
         ctx.beginPath(); ctx.arc(500, 340, 310, Math.PI, 0); ctx.stroke();
         for (let a = Math.PI; a <= Math.PI * 2; a += 0.15) {
@@ -437,7 +428,6 @@
         ctx.fillStyle = '#1e293b'; ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 6;
         ctx.beginPath(); ctx.arc(0, 0, radius, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
 
-        // FIXED RADIAL SLICE DRAWING MATH: Align wedge drawings perfectly centered split down divisions
         for (let i = 0; i < TOTAL_SEGMENTS; i++) {
             ctx.save();
             ctx.rotate(i * SEGMENT_ARC);
@@ -445,17 +435,14 @@
             let value = WHEEL_VALUES[i];
             ctx.fillStyle = value === 1.00 ? '#ef4444' : (i % 2 === 0 ? '#0f5132' : '#ffffff');
             
-            // Draw perfectly split arc segment wedges matching divisions
             ctx.beginPath();
             ctx.moveTo(0, 0);
             ctx.arc(0, 0, radius - 4, -SEGMENT_ARC / 2, SEGMENT_ARC / 2);
             ctx.closePath(); ctx.fill(); 
 
-            // Dividers Gold Outline pins line drawings
             ctx.strokeStyle = '#fbbf24'; ctx.lineWidth = 2;
             ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(radius, -SEGMENT_ARC / 2); ctx.stroke();
 
-            // Render Text values facing outwards cleanly
             ctx.fillStyle = (value === 1.00 || i % 2 === 0) ? '#ffffff' : '#000000';
             ctx.font = 'bold 24px monospace'; ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
             let label = value === 1.00 ? "1.00" : (value * 100).toFixed(0);
@@ -465,25 +452,21 @@
         }
         ctx.restore();
 
-        // Top Centered Pointer Pin Marker Indicator
         ctx.fillStyle = '#ef4444'; ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2;
         ctx.beginPath(); ctx.moveTo(500, 315); ctx.lineTo(485, 285); ctx.lineTo(515, 285); ctx.closePath(); ctx.fill(); ctx.stroke();
     }
 
     function renderPlinkoComponent() {
-        // Draw Peg grid configurations
         ctx.fillStyle = '#94a3b8';
         plinkoPegs.forEach(peg => {
             ctx.beginPath(); ctx.arc(peg.x, peg.y, peg.radius, 0, Math.PI*2); ctx.fill();
         });
 
-        // Draw lower collection divider wall grids
         ctx.strokeStyle = '#3b4252'; ctx.lineWidth = 4;
         for (let i = 1; i < PLINKO_SLOTS.length; i++) {
             ctx.beginPath(); ctx.moveTo(i * SLOT_WIDTH, 500); ctx.lineTo(i * SLOT_WIDTH, 560); ctx.stroke();
         }
 
-        // Draw Prize value banner strips across base channels
         ctx.font = 'bold 16px monospace'; ctx.textAlign = 'center';
         for (let i = 0; i < PLINKO_SLOTS.length; i++) {
             let val = PLINKO_SLOTS[i];
@@ -492,14 +475,12 @@
             ctx.fillText(txt, (i * SLOT_WIDTH) + SLOT_WIDTH/2, 535);
         }
 
-        // Draw live descending active simulation chips
         ctx.fillStyle = '#fbbf24'; ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2;
         plinkoChips.forEach(c => {
             ctx.beginPath(); ctx.arc(c.x, c.y, c.radius, 0, Math.PI*2); ctx.fill(); ctx.stroke();
         });
     }
 
-    // --- Drag Swipe & Mobile Touch Velocity Trackers ---
     function setupInputTracking() {
         canvas.addEventListener('mousedown', (e) => {
             initAudio();
@@ -518,7 +499,6 @@
 
         window.addEventListener('mouseup', () => { isDragging = false; });
 
-        // Touch event tracking adjustments for mobile Samsung fold screens
         canvas.addEventListener('touchstart', (e) => {
             initAudio();
             if (currentMode === 'WHEEL') { isDragging = true; lastMouseY = e.touches[0].clientY; }
