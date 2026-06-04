@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Price is Right - Showcase Showdown Edition</title>
+    <style>
+        :root {
+            --bg-color: #0f111a;
+            --panel-bg: rgba(30, 41, 59, 0.7);
+            --border-accent: #f59e0b;
+            --accent-color: #ef4444;
+            --accent-hover: #dc2626;
+            --text-color: #f8fafc;
+            --text-muted: #94a3b8;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: var(--bg-color);
+            background-image: radial-gradient(circle at 50% 50%, #1e1b4b 0%, #09090b 100%);
+            color: var(--text-color);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+            overflow-x: hidden;
+        }
+
+        .game-container {
+            display: grid;
+            grid-template-columns: 1fr 320px;
+            gap: 24px;
+            max-width: 1440px;
+            width: 100%;
+        }
+
+        .canvas-container {
+            position: relative;
+            background: #020205;
+            border-radius: 24px;
+            overflow: hidden;
+            border: 3px solid #fbbf24;
+            box-shadow: 0 0 30px rgba(251, 191, 36, 0.2), 0 25px 50px -12px rgba(0, 0, 0, 0.9);
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: auto;
+        }
+
+        .sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .panel {
+            background-color: var(--panel-bg);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border-radius: 16px;
+            padding: 18px;
+            border: 1px solid rgba(251, 191, 36, 0.2);
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.4);
+        }
+
+        h3 {
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            margin-bottom: 14px;
+            color: #fbbf24;
+            border-bottom: 1px solid rgba(251, 191, 36, 0.2);
+            padding-bottom: 8px;
+        }
+
+        .game-selector-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 10px;
+        }
+
+        button {
+            background-color: rgba(255, 255, 255, 0.05);
+            color: var(--text-color);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            padding: 12px 14px;
+            font-weight: 600;
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        button:hover:not(:disabled) {
+            background-color: rgba(255, 255, 255, 0.12);
+            border-color: rgba(255, 255, 255, 0.2);
+        }
+
+        button.active-game {
+            background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+            color: #000;
+            border-color: #fbbf24;
+        }
+
+        button.action-btn {
+            background-color: #ef4444;
+            border-color: rgba(255,255,255,0.1);
+        }
+        button.action-btn:hover:not(:disabled) {
+            background-color: #dc2626;
+        }
+
+        .log-box {
+            height: 200px;
+            overflow-y: auto;
+            font-family: ui-monospace, monospace;
+            font-size: 11.5px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .log-entry {
+            line-height: 1.4;
+            padding: 6px;
+            border-radius: 6px;
+            background: rgba(0, 0, 0, 0.2);
+            border-left: 3px solid #64748b;
+        }
+        .log-host { color: #fba124; border-left-color: #fbbf24; font-weight: bold; }
+        .log-win { color: #34d399; border-left-color: #10b981; font-weight: bold; }
+        .log-fail { color: #f87171; border-left-color: #ef4444; }
+
+        .stat-val {
+            font-size: 28px;
+            font-family: monospace;
+            font-weight: bold;
+            color: #34d399;
+            text-shadow: 0 0 10px rgba(52, 211, 153, 0.2);
+        }
+    </style>
+</head>
+<body>
+
+<div class="game-container">
+    <div class="canvas-container">
+        <canvas id="studioCanvas" width="1000" height="640"></canvas>
+    </div>
+
+    <!-- Ergonomic Sidebar Interface -->
+    <div class="sidebar">
+        <!-- 1. Mini Game Menu -->
+        <div class="panel">
+            <h3>Select Game</h3>
+            <div class="game-selector-grid">
+                <button class="active-game" onclick="switchGame('WHEEL')">The Big Wheel</button>
+                <button disabled title="Plinko pipeline incoming soon!">Plinko (Locked)</button>
+                <button disabled title="Cliff Hangers incoming soon!">Cliff Hangers (Locked)</button>
+            </div>
+        </div>
+
+        <!-- 2. Studio Action Log -->
+        <div class="panel">
+            <h3>Studio Log</h3>
+            <div class="log-box" id="logBox"></div>
+        </div>
+
+        <!-- 3. Contestant Bankroll Scoreboard -->
+        <div class="panel">
+            <h3>Contestant Stats</h3>
+            <div style="margin-bottom: 10px;">
+                <div style="font-size: 11px; text-transform: uppercase; color: var(--text-muted);">Total Winnings</div>
+                <div class="stat-val" id="winningsDisplay">$0</div>
+            </div>
+            <div>
+                <div style="font-size: 11px; text-transform: uppercase; color: var(--text-muted);">Current Spin Score</div>
+                <div class="stat-val" id="scoreDisplay" style="color: #fbbf24;">0.00</div>
+            </div>
+            <button class="action-btn" id="btnSpin" style="width: 100%; margin-top: 14px; color: white;" onclick="triggerButtonSpin()">Spin The Wheel!</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    let canvas, ctx;
+    let audioCtx = null;
+    let appState = {};
+
+    // Wheel Configurations & Segment Setup
+    const WHEEL_VALUES = [
+        0.05, 1.00, 0.15, 0.80, 0.35, 0.70, 0.25, 0.60, 0.45, 0.55,
+        0.40, 0.65, 0.30, 0.75, 0.20, 0.85, 0.10, 0.95, 0.50, 0.90
+    ];
+    const TOTAL_SEGMENTS = WHEEL_VALUES.length;
+    const SEGMENT_ARC = (Math.PI * 2) / TOTAL_SEGMENTS;
+
+    // Interaction Tracking variables
+    let isDragging = false;
+    let startY = 0;
+    let lastY = 0;
+    let dragVelocity = 0;
+
+    window.onload = function() {
+        canvas = document.getElementById('studioCanvas');
+        ctx = canvas.getContext('2d');
+
+        setupEventHandlers();
+        loadWinningsState();
+        initBigWheelGame();
+
+        setInterval(runStudioTick, 30);
+    };
+
+    function initAudio() {
+        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+
+    function playClickSound(speedFactor) {
+        try {
+            initAudio();
+            if (!audioCtx) return;
+            
+            let osc = audioCtx.createOscillator();
+            let gainNode = audioCtx.createGain();
+            osc.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+
+            // Synthesize a heavy organic mechanical wooden index pin clack
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(140 + (speedFactor * 30), audioCtx.currentTime);
+            gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.05);
+
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.05);
+        } catch(e) {}
+    }
+
+    function initBigWheelGame() {
+        appState = {
+            gameMode: 'WHEEL',
+            wheelAngle: 0,
+            wheelVelocity: 0,
+            spinCount: 0,
+            currentTotalScore: 0,
+            lastClickIndex: 0,
+            wheelCenter: { x: 500, y: 780 }, // Positions massive wheel off bottom edge of canvas
+            wheelRadius: 420
+        };
+        logMessage("Bob Barker: Welcome to the Showcase Showdown! Step up and give that wheel a spin!", "host");
+    }
+
+    function runStudioTick() {
+        processWheelPhysics();
+        renderStudio();
+    }
+
+    function processWheelPhysics() {
+        if (appState.gameMode !== 'WHEEL') return;
+
+        if (isDragging) {
+            appState.wheelVelocity = dragVelocity;
+            dragVelocity *= 0.85; // Natural decay during hold drag actions
+        } else {
+            // Apply realistic structural friction drag coefficient
+            appState.wheelAngle += appState.wheelVelocity;
+            appState.wheelVelocity *= 0.982; 
+
+            if (Math.abs(appState.wheelVelocity) < 0.0008 && appState.wheelVelocity !== 0) {
+                appState.wheelVelocity = 0;
+                calculateFinalSpinScore();
+            }
+        }
+
+        // Mechanical clicking sound math tracking triggers
+        let curClickIdx = Math.floor(appState.wheelAngle / SEGMENT_ARC);
+        if (curClickIdx !== appState.lastClickIndex) {
+            let speed = Math.min(5, Math.abs(appState.wheelVelocity) * 10);
+            if (speed > 0.05) {
+                playClickSound(speed);
+            }
+            appState.lastClickIndex = curClickIdx;
+        }
+    }
+
+    function triggerButtonSpin() {
+        if (appState.wheelVelocity !== 0) return;
+        document.getElementById('btnSpin').disabled = true;
+        appState.wheelVelocity = 0.25 + (Math.random() * 0.25); // Launch randomly high speed
+        logMessage("The wheel is spinning! Come on dollar!", "system");
+    }
+
+    function calculateFinalSpinScore() {
+        // Normalize angle to find segment sitting at the absolute top vertical pin point (12 o'clock position)
+        let normalizedAngle = (appState.wheelAngle % (Math.PI * 2));
+        if (normalizedAngle < 0) normalizedAngle += (Math.PI * 2);
+
+        // Calculate offset index relative to top pointing click marker
+        let pointedSegment = Math.floor((Math.PI * 1.5 - normalizedAngle) / SEGMENT_ARC) % TOTAL_SEGMENTS;
+        if (pointedSegment < 0) pointedSegment += TOTAL_SEGMENTS;
+
+        let spinValue = WHEEL_VALUES[pointedSegment];
+        appState.spinCount++;
+        appState.currentTotalScore += spinValue;
+
+        document.getElementById('scoreDisplay').innerText = appState.currentTotalScore.toFixed(2);
+
+        logMessage(`Spin #${appState.spinCount} lands on: $${spinValue.toFixed(2)}`, "system");
+
+        if (appState.currentTotalScore === 1.00) {
+            logMessage("Bob Barker: UNBELIEVABLE! You hit exactly ONE DOLLAR! You win a $10,000 bonus prize!", "win");
+            updateTotalWinnings(10000);
+            resetTurnTrack();
+        } else if (appState.currentTotalScore > 1.00) {
+            logMessage(`Bob Barker: Oh no, a total of $${appState.currentTotalScore.toFixed(2)} is over a dollar! I'm so sorry, you're eliminated.`, "fail");
+            resetTurnTrack();
+        } else {
+            if (appState.spinCount === 1) {
+                logMessage(`Bob Barker: You have $${appState.currentTotalScore.toFixed(2)}. Do you want to stand, or spin again? Swipe or press spin to risk it!`, "host");
+                document.getElementById('btnSpin').disabled = false;
+            } else {
+                logMessage(`Bob Barker: You finish with a strong final score of $${appState.currentTotalScore.toFixed(2)}! Good luck holding onto the lead!`, "win");
+                updateTotalWinnings(appState.currentTotalScore * 1000); // Scaled conversion cash prize payout
+                resetTurnTrack();
+            }
+        }
+    }
+
+    function resetTurnTrack() {
+        appState.spinCount = 0;
+        appState.currentTotalScore = 0;
+        document.getElementById('btnSpin').disabled = false;
+    }
+
+    // --- High fidelity Canvas Rendering Graphics Grid ---
+    function renderStudio() {
+        // 1. Fill Studio Base Stage Background Glow
+        ctx.fillStyle = '#060612';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // 2. Draw Retro Neon Chasing Arch Backing Frame
+        ctx.strokeStyle = '#3b82f6';
+        ctx.lineWidth = 6;
+        ctx.beginPath();
+        ctx.arc(500, 360, 300, Math.PI, 0, false);
+        ctx.stroke();
+
+        // Decorative 70s Hollywood Studio border lights
+        for (let a = Math.PI; a <= Math.PI * 2; a += 0.15) {
+            let lx = 500 + Math.cos(a) * 300;
+            let ly = 360 + Math.sin(a) * 300;
+            ctx.fillStyle = '#fbbf24';
+            ctx.beginPath(); ctx.arc(lx, ly, 5, 0, Math.PI*2); ctx.fill();
+        }
+
+        if (appState.gameMode === 'WHEEL') {
+            drawBigWheelComponent();
+        }
+    }
+
+    function drawBigWheelComponent() {
+        ctx.save();
+        ctx.translate(appState.wheelCenter.x, appState.wheelCenter.y);
+        ctx.rotate(appState.wheelAngle);
+
+        // Draw outer heavy steel rim border track
+        ctx.fillStyle = '#1e293b';
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 8;
+        ctx.beginPath();
+        ctx.arc(0, 0, appState.wheelRadius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+
+        // Render each alternating green, red, and white prize card canvas wedge
+        for (let i = 0; i < TOTAL_SEGMENTS; i++) {
+            ctx.save();
+            ctx.rotate(i * SEGMENT_ARC);
+
+            // Style alternations matches the authentic game show wheel layout
+            let value = WHEEL_VALUES[i];
+            if (value === 1.00) {
+                ctx.fillStyle = '#ef4444'; // Bright Red 100 Segment
+            } else if (i % 2 === 0) {
+                ctx.fillStyle = '#0f5132'; // Classic Emerald Green
+            } else {
+                ctx.fillStyle = '#ffffff'; // High contrast white card panels
+            }
+
+            // Draw pie slice wedges
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.arc(0, 0, appState.wheelRadius - 6, -SEGMENT_ARC/2, SEGMENT_ARC/2);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+
+            // Render prominent value numbers readable along circumference
+            ctx.fillStyle = (value === 1.00 || i % 2 === 0) ? '#ffffff' : '#000000';
+            ctx.font = 'bold 26px monospace';
+            ctx.textAlign = 'right';
+            ctx.textBaseline = 'middle';
+            
+            // Format labels matching cents or perfect dollar configurations
+            let displayString = value === 1.00 ? "1.00" : (value * 100).toFixed(0);
+            ctx.fillText(displayString, appState.wheelRadius - 24, 0);
+
+            // Draw radial dividing spokes divider pegs
+            ctx.strokeStyle = '#fbbf24';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.moveTo(0,0);
+            ctx.lineTo(appState.wheelRadius, SEGMENT_ARC/2);
+            ctx.stroke();
+
+            ctx.restore();
+        }
+
+        ctx.restore();
+
+        // Draw top central absolute vertical active selector indicator needle marker arrow
+        ctx.fillStyle = '#ef4444';
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(500, 320);
+        ctx.lineTo(485, 290);
+        ctx.lineTo(515, 290);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+    }
+
+    // --- Touch/Mouse interactive kinetic mapping swipe handlers ---
+    function setupEventHandlers() {
+        canvas.addEventListener('mousedown', (e) => {
+            initAudio();
+            isDragging = true;
+            startY = e.clientY;
+            lastY = startY;
+        });
+
+        canvas.addEventListener('mousemove', (e) => {
+            if (!isDragging) return;
+            let currentY = e.clientY;
+            dragVelocity = (currentY - lastY) * 0.0015; // Maps tracking speed directly to kinetic velocity scales
+            lastY = currentY;
+        });
+
+        window.addEventListener('mouseup', () => {
+            isDragging = false;
+        });
+
+        // Touch event integrations for unfolded Samsung Z Fold screens
+        canvas.addEventListener('touchstart', (e) => {
+            initAudio();
+            isDragging = true;
+            startY = e.touches[0].clientY;
+            lastY = startY;
+        });
+
+        canvas.addEventListener('touchmove', (e) => {
+            if (!isDragging) return;
+            let currentY = e.touches[0].clientY;
+            dragVelocity = (currentY - lastY) * 0.0015;
+            lastY = currentY;
+        });
+
+        canvas.addEventListener('touchend', () => {
+            isDragging = false;
+        });
+    }
+
+    function logMessage(msg, type) {
+        let box = document.getElementById('logBox');
+        if (!box) return;
+        let entry = document.createElement('div');
+        entry.className = `log-entry log-${type}`;
+        entry.innerText = msg;
+        box.appendChild(entry);
+        box.scrollTop = box.scrollHeight;
+    }
+
+    function updateTotalWinnings(amount) {
+        let currentWinnings = parseInt(localStorage.getItem('pir_total_winnings') || "0");
+        currentWinnings += amount;
+        localStorage.setItem('pir_total_winnings', currentWinnings.toString());
+        document.getElementById('winningsDisplay').innerText = `$${currentWinnings.toLocaleString()}`;
+    }
+
+    function loadWinningsState() {
+        let currentWinnings = parseInt(localStorage.getItem('pir_total_winnings') || "0");
+        document.getElementById('winningsDisplay').innerText = `$${currentWinnings.toLocaleString()}`;
+    }
+</script>
+
+</body>
+</html>
