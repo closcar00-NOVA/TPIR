@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>The Price is Right - Championship Suite v3.0 Ultimate</title>
+    <title>The Price is Right - Championship Suite v4.0</title>
     <style>
         :root {
             --bg-color: #0b0c10;
@@ -31,20 +31,29 @@
             box-shadow: 0 0 40px var(--shadow-glow), 0 30px 60px -15px rgba(0, 0, 0, 0.95);
         }
         canvas { display: block; width: 100%; height: auto; }
-        .sidebar { display: flex; flex-direction: column; gap: 24px; }
+        .sidebar { display: flex; flex-direction: column; gap: 20px; }
         .panel {
             background-color: var(--panel-bg); backdrop-filter: blur(20px); border-radius: 20px;
-            padding: 22px; border: 1px solid rgba(254, 209, 0, 0.15); box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+            padding: 20px; border: 1px solid rgba(254, 209, 0, 0.15); box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
         }
-        h3 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.12em; margin-bottom: 16px; color: var(--jamaica-gold); border-bottom: 2px solid rgba(254, 209, 0, 0.2); padding-bottom: 10px; }
-        .game-selector-grid { display: grid; grid-template-columns: 1fr; gap: 12px; }
+        h3 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.12em; margin-bottom: 12px; color: var(--jamaica-gold); border-bottom: 2px solid rgba(254, 209, 0, 0.2); padding-bottom: 8px; }
+        
+        /* New Instructions Box */
+        .instructions-box {
+            background: rgba(0, 155, 58, 0.1); border-left: 4px solid var(--jamaica-green);
+            padding: 12px; font-size: 13px; line-height: 1.5; color: #cbd5e1; border-radius: 4px;
+            margin-bottom: 16px;
+        }
+        .instructions-box strong { color: #fff; }
+
+        .game-selector-grid { display: grid; grid-template-columns: 1fr; gap: 10px; }
         button {
             background: rgba(255, 255, 255, 0.03); color: var(--text-color); border: 1px solid rgba(255, 255, 255, 0.08);
-            border-radius: 12px; padding: 14px 16px; font-weight: 700; font-size: 14px; cursor: pointer; transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+            border-radius: 12px; padding: 12px 16px; font-weight: 700; font-size: 14px; cursor: pointer; transition: all 0.3s ease;
         }
         button:hover:not(:disabled) { background: rgba(255, 255, 255, 0.08); border-color: var(--jamaica-gold); transform: translateY(-1px); }
         button.active-game { background: linear-gradient(135deg, var(--jamaica-gold) 0%, #ccaa00 100%); color: #000; border-color: #fff; box-shadow: 0 4px 15px rgba(254, 209, 0, 0.3); }
-        .log-box { height: 200px; overflow-y: auto; font-family: ui-monospace, monospace; font-size: 12px; display: flex; flex-direction: column; gap: 8px; scroll-behavior: smooth; }
+        .log-box { height: 160px; overflow-y: auto; font-family: ui-monospace, monospace; font-size: 12px; display: flex; flex-direction: column; gap: 8px; scroll-behavior: smooth; }
         .log-entry { line-height: 1.5; padding: 8px 12px; border-radius: 8px; background: rgba(0, 0, 0, 0.4); border-left: 4px solid #64748b; }
         .log-host { color: var(--jamaica-gold); border-left-color: var(--jamaica-gold); font-weight: bold; }
         .log-win { color: #10b981; border-left-color: var(--jamaica-green); font-weight: bold; }
@@ -57,7 +66,7 @@
             text-align: center; margin-top: 8px; outline: none; transition: all 0.2s;
         }
         .guess-input:focus { border-color: var(--jamaica-gold); box-shadow: 0 0 15px rgba(254, 209, 0, 0.4); }
-        .main-action-btn { width: 100%; margin-top: 16px; color: black; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; background: linear-gradient(135deg, var(--jamaica-green) 0%, #00772c 100%); color: white; border: none; }
+        .main-action-btn { width: 100%; margin-top: 10px; color: black; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; background: linear-gradient(135deg, var(--jamaica-green) 0%, #00772c 100%); color: white; border: none; }
         .main-action-btn:hover:not(:disabled) { background: linear-gradient(135deg, #00b344 0%, var(--jamaica-green) 100%); box-shadow: 0 6px 20px rgba(0, 155, 58, 0.4); }
     </style>
 </head>
@@ -73,30 +82,40 @@
                 <button id="navCliff" onclick="switchGameMode('CLIFF')">Cliff Hangers</button>
             </div>
         </div>
-        <div class="panel"><h3>Production Feed</h3><div class="log-box" id="logBox"></div></div>
-        <div class="panel">
+        
+        <div class="panel" style="padding: 16px 20px;">
             <h3 id="panelStatsTitle">Wheel Controls</h3>
-            <div style="margin-bottom: 12px;"><div style="font-size: 11px; text-transform: uppercase; color: var(--text-muted); letter-spacing: 0.05em;">Bankroll Balance</div><div class="stat-val" id="winningsDisplay">$0</div></div>
             
-            <div id="interactiveScoreRow">
-                <div style="font-size: 11px; text-transform: uppercase; color: var(--text-muted); letter-spacing: 0.05em;" id="scoreLabelText">Current Spin Score</div>
-                <div class="stat-val" id="scoreDisplay" style="color: var(--jamaica-gold);">0.00</div>
+            <!-- Dynamic Instructions Module -->
+            <div id="gameInstructions" class="instructions-box">
+                <strong>How to Play:</strong> Click and drag up/down on the wheel, or press Spin. Try to get as close to 1.00 as possible without going over in a maximum of two spins!
+            </div>
+
+            <div style="margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center;">
+                <div style="font-size: 11px; text-transform: uppercase; color: var(--text-muted); letter-spacing: 0.05em;">Bankroll Balance</div>
+                <div class="stat-val" id="winningsDisplay" style="font-size: 24px;">$0</div>
             </div>
             
-            <div id="cliffGuessRow" style="display: none; margin-top: 10px;">
+            <div id="interactiveScoreRow" style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 12px;">
+                <div style="font-size: 11px; text-transform: uppercase; color: var(--text-muted); letter-spacing: 0.05em;" id="scoreLabelText">Current Score</div>
+                <div class="stat-val" id="scoreDisplay" style="color: var(--jamaica-gold); font-size: 24px;">0.00</div>
+            </div>
+            
+            <div id="cliffGuessRow" style="display: none; margin-top: 5px;">
                 <div style="font-size: 11px; text-transform: uppercase; color: var(--text-muted); letter-spacing: 0.05em;">Enter Price Guess ($)</div>
                 <input type="number" id="cliffGuessInput" class="guess-input" placeholder="0" />
             </div>
 
             <button id="actionBtn" class="main-action-btn" onclick="handleMainAction()">Spin The Wheel!</button>
         </div>
+
+        <div class="panel" style="flex-grow: 1;"><h3>Production Feed</h3><div class="log-box" id="logBox"></div></div>
     </div>
 </div>
 <script>
     let canvas, ctx, audioCtx = null;
     let currentMode = 'WHEEL', lifetimeWinnings = 0, glowPulseFrame = 0;
     
-    // --- JUICY VISUALS EFFECTS STATE ---
     let particles = [];
     let activePegGlows = [];
 
@@ -121,7 +140,7 @@
 
     window.onload = function() {
         canvas = document.getElementById('studioCanvas'); ctx = canvas.getContext('2d');
-        setupInputTracking(); loadWinningsState(); initBigWheelEngine(); setInterval(studioMainLoop, 1000 / 60); // Clean 60 FPS
+        setupInputTracking(); loadWinningsState(); initBigWheelEngine(); setInterval(studioMainLoop, 1000 / 60);
     };
 
     function initAudio() { if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)(); }
@@ -138,12 +157,11 @@
                 osc.start(); osc.stop(audioCtx.currentTime + 0.05);
             }
             else if (type === 'peg') { 
-                osc.type = 'sine'; osc.frequency.setValueAtTime(523.25 + Math.random() * 300, audioCtx.currentTime); // C5 base musical scale
+                osc.type = 'sine'; osc.frequency.setValueAtTime(523.25 + Math.random() * 300, audioCtx.currentTime);
                 gainNode.gain.setValueAtTime(0.25, audioCtx.currentTime); gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.08); 
                 osc.start(); osc.stop(audioCtx.currentTime + 0.08);
             }
             else if (type === 'win') { 
-                // Play chord arpeggio
                 [440, 554.37, 659.25, 880].forEach((freq, idx) => {
                     let o = audioCtx.createOscillator(), g = audioCtx.createGain();
                     o.type = 'sawtooth'; o.frequency.setValueAtTime(freq, audioCtx.currentTime + idx*0.08);
@@ -168,14 +186,7 @@
 
     function spawnParticles(x, y, color) {
         for(let i=0; i<12; i++) {
-            particles.push({
-                x: x, y: y,
-                vx: (Math.random() - 0.5) * 6,
-                vy: (Math.random() - 0.5) * 6,
-                radius: Math.random() * 4 + 2,
-                alpha: 1,
-                color: color
-            });
+            particles.push({ x: x, y: y, vx: (Math.random() - 0.5) * 6, vy: (Math.random() - 0.5) * 6, radius: Math.random() * 4 + 2, alpha: 1, color: color });
         }
     }
 
@@ -187,20 +198,24 @@
         
         let scoreRow = document.getElementById('interactiveScoreRow');
         let cliffRow = document.getElementById('cliffGuessRow');
+        let instructions = document.getElementById('gameInstructions');
 
         if (mode === 'WHEEL') { 
-            document.getElementById('panelStatsTitle').innerText = "Wheel Controls"; document.getElementById('scoreLabelText').innerText = "Current Spin Score"; 
+            document.getElementById('panelStatsTitle').innerText = "Wheel Controls"; document.getElementById('scoreLabelText').innerText = "Current Score"; 
             document.getElementById('actionBtn').innerText = "Spin The Wheel!"; document.getElementById('actionBtn').disabled = false;
-            scoreRow.style.display = 'block'; cliffRow.style.display = 'none'; initBigWheelEngine(); 
+            instructions.innerHTML = "<strong>How to Play:</strong> Click and drag up/down on the wheel, or press Spin. Try to get as close to 1.00 as possible without going over in a maximum of two spins!";
+            scoreRow.style.display = 'flex'; cliffRow.style.display = 'none'; initBigWheelEngine(); 
         }
         else if (mode === 'PLINKO') { 
             document.getElementById('panelStatsTitle').innerText = "Plinko Premium Dashboard"; document.getElementById('scoreLabelText').innerText = "Available Chips"; 
             document.getElementById('actionBtn').innerText = "Claim Pricing Chips"; document.getElementById('actionBtn').disabled = false;
-            scoreRow.style.display = 'block'; cliffRow.style.display = 'none'; initPlinkoEngine(); 
+            instructions.innerHTML = "<strong>How to Play:</strong> Click anywhere inside the game area near the top of the board to drop your chips. Watch them bounce down into the multipliers below!";
+            scoreRow.style.display = 'flex'; cliffRow.style.display = 'none'; initPlinkoEngine(); 
         }
         else if (mode === 'CLIFF') {
             document.getElementById('panelStatsTitle').innerText = "Cliff Hangers Terminal"; 
             document.getElementById('actionBtn').innerText = "Lock In Guess!"; document.getElementById('actionBtn').disabled = false;
+            instructions.innerHTML = "<strong>How to Play:</strong> Guess the EXACT price of the item! For every $1 your guess is wrong, the climber takes 1 step up the mountain. If he takes 25 steps, he falls!";
             scoreRow.style.display = 'none'; cliffRow.style.display = 'block'; initCliffEngine();
         }
     }
@@ -242,7 +257,7 @@
             let actual = CLIFF_ITEMS[cliffItemIndex].actualPrice;
             let diff = Math.abs(guess - actual);
             
-            logMessage(`Item Cost: $${actual}. Total discrepancy: $${diff}!`, "system");
+            logMessage(`Item Cost: $${actual}. You guessed $${guess}. Off by $${diff}!`, "system");
             document.getElementById('actionBtn').disabled = true;
             
             cliffTargetStep = cliffCurrentStep + diff;
@@ -263,18 +278,15 @@
     }
 
     function processPlinkoPhysics() {
-        // Update glow indicators expiration frames
         activePegGlows = activePegGlows.filter(g => { g.frames--; return g.frames > 0; });
-
         for (let i = plinkoChips.length - 1; i >= 0; i--) {
-            let c = plinkoChips[i]; c.vy += 0.42; c.x += c.vx; c.y += c.vy; // Dynamic gravity pull
+            let c = plinkoChips[i]; c.vy += 0.42; c.x += c.vx; c.y += c.vy;
             if (c.x < 20 || c.x > 980) { c.vx *= -0.7; c.x = c.x < 20 ? 20 : 980; }
             
             plinkoPegs.forEach(peg => {
                 let dx = c.x - peg.x, dy = c.y - peg.y, dist = Math.sqrt(dx*dx + dy*dy);
                 if (dist < c.radius + peg.radius) {
-                    playSound('peg');
-                    activePegGlows.push({ id: peg.id, frames: 15 });
+                    playSound('peg'); activePegGlows.push({ id: peg.id, frames: 15 });
                     spawnParticles(peg.x, peg.y, varColor('--jamaica-gold'));
                     let angle = Math.atan2(dy, dx);
                     c.x = peg.x + Math.cos(angle) * (c.radius + peg.radius + 1); 
@@ -286,14 +298,7 @@
             });
             if (c.y > 545) {
                 let slotIdx = Math.max(0, Math.min(PLINKO_SLOTS.length - 1, Math.floor(c.x / SLOT_WIDTH))), prize = PLINKO_SLOTS[slotIdx];
-                if (prize > 0) { 
-                    logMessage(`BOOM! LANDED IN $${prize.toLocaleString()}!`, "win"); 
-                    playSound('win'); 
-                    updateWinningsLedger(prize);
-                    spawnParticles(c.x, c.y, varColor('--jamaica-green'));
-                } else { 
-                    logMessage("Bummer, $0 entry point hit.", "fail"); 
-                }
+                if (prize > 0) { logMessage(`BOOM! LANDED IN $${prize.toLocaleString()}!`, "win"); playSound('win'); updateWinningsLedger(prize); spawnParticles(c.x, c.y, varColor('--jamaica-green')); } else { logMessage("Bummer, $0 entry point hit.", "fail"); }
                 plinkoChips.splice(i, 1);
             }
         }
@@ -307,32 +312,19 @@
             cliffGuy.y = 550 + (cliffCurrentStep * -16);
 
             let now = Date.now();
-            if (now - lastYodelTime > 220) {
-                playSound(Math.floor(cliffCurrentStep) % 2 === 0 ? 'yodel_high' : 'yodel_low');
-                lastYodelTime = now;
-            }
+            if (now - lastYodelTime > 220) { playSound(Math.floor(cliffCurrentStep) % 2 === 0 ? 'yodel_high' : 'yodel_low'); lastYodelTime = now; }
 
             if (cliffCurrentStep >= cliffTargetStep) {
                 cliffCurrentStep = cliffTargetStep;
-                cliffGuy.x = 100 + (cliffCurrentStep * 28);
-                cliffGuy.y = 550 + (cliffCurrentStep * -16);
+                cliffGuy.x = 100 + (cliffCurrentStep * 28); cliffGuy.y = 550 + (cliffCurrentStep * -16);
                 cliffWalking = false;
 
                 if (cliffCurrentStep <= 25) {
                     cliffItemIndex++;
-                    if (cliffItemIndex >= CLIFF_ITEMS.length) {
-                        logMessage("JACKPOT! You protected the climber! $25k Bonus!", "win");
-                        updateWinningsLedger(25000); playSound('win');
-                        cliffGameOver = true;
-                    } else {
-                        document.getElementById('actionBtn').disabled = false;
-                    }
+                    if (cliffItemIndex >= CLIFF_ITEMS.length) { logMessage("JACKPOT! You protected the climber! $25k Bonus!", "win"); updateWinningsLedger(25000); playSound('win'); cliffGameOver = true; } else { document.getElementById('actionBtn').disabled = false; }
                 }
             }
-            if (cliffCurrentStep > 25) {
-                cliffGuy.falling = true; playSound('fall');
-                logMessage("CRITICAL DROP: Over the summit!", "fail");
-            }
+            if (cliffCurrentStep > 25) { cliffGuy.falling = true; playSound('fall'); logMessage("CRITICAL DROP: Over the summit! Game Over.", "fail"); }
         } else {
             cliffGuy.x += 2.5; cliffGuy.vy += 0.6; cliffGuy.y += cliffGuy.vy; cliffGuy.angle += 0.15;
             if (cliffGuy.y > 700) { cliffWalking = false; cliffGameOver = true; }
@@ -353,23 +345,13 @@
 
     function studioMainLoop() { 
         glowPulseFrame += 0.06; 
-        if (currentMode === 'WHEEL') processWheelPhysics(); 
-        else if (currentMode === 'PLINKO') processPlinkoPhysics(); 
-        else if (currentMode === 'CLIFF') processCliffPhysics();
-
-        // Update Particle systems
-        particles.forEach((p, idx) => {
-            p.x += p.vx; p.y += p.vy; p.alpha -= 0.02;
-            if(p.alpha <= 0) particles.splice(idx, 1);
-        });
-
+        if (currentMode === 'WHEEL') processWheelPhysics(); else if (currentMode === 'PLINKO') processPlinkoPhysics(); else if (currentMode === 'CLIFF') processCliffPhysics();
+        particles.forEach((p, idx) => { p.x += p.vx; p.y += p.vy; p.alpha -= 0.02; if(p.alpha <= 0) particles.splice(idx, 1); });
         renderStudioGraphics(); 
     }
 
     function renderStudioGraphics() {
         ctx.fillStyle = '#06070a'; ctx.fillRect(0, 0, canvas.width, canvas.height);
-        
-        // Premium Stage Outer Border Elements
         ctx.strokeStyle = 'rgba(0, 155, 58, 0.15)'; ctx.lineWidth = 6; ctx.beginPath(); ctx.arc(500, 340, 315, Math.PI, 0); ctx.stroke();
         for (let a = Math.PI; a <= Math.PI * 2; a += 0.1) { 
             let pulseSize = 4 + Math.sin(glowPulseFrame + a*3) * 1.5;
@@ -380,138 +362,121 @@
         else if (currentMode === 'PLINKO') renderPlinkoComponent();
         else if (currentMode === 'CLIFF') renderCliffComponent();
 
-        // Render Active Engine Particles
-        particles.forEach(p => {
-            ctx.save(); ctx.globalAlpha = p.alpha; ctx.fillStyle = p.color;
-            ctx.beginPath(); ctx.arc(p.x, p.y, p.radius, 0, Math.PI*2); ctx.fill(); ctx.restore();
-        });
+        particles.forEach(p => { ctx.save(); ctx.globalAlpha = p.alpha; ctx.fillStyle = p.color; ctx.beginPath(); ctx.arc(p.x, p.y, p.radius, 0, Math.PI*2); ctx.fill(); ctx.restore(); });
     }
 
     function renderBigWheelComponent() {
-        let center = { x: 500, y: 760 }, radius = 430; ctx.save(); ctx.translate(center.x, center.y); ctx.rotate(wheelAngle);
-        ctx.shadowBlur = 20; ctx.shadowColor = "rgba(0,0,0,0.5)";
-        ctx.fillStyle = '#111318'; ctx.strokeStyle = '#fff'; ctx.lineWidth = 8; ctx.beginPath(); ctx.arc(0, 0, radius, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-        ctx.shadowBlur = 0;
+        let center = { x: 500, y: 760 }, radius = 430; 
+        ctx.save(); ctx.translate(center.x, center.y); 
+        
+        // Realistic Background Rim 
+        ctx.beginPath(); ctx.arc(0, 0, radius + 15, 0, Math.PI * 2);
+        let rimGrad = ctx.createLinearGradient(-radius, -radius, radius, radius);
+        rimGrad.addColorStop(0, '#475569'); rimGrad.addColorStop(0.5, '#1e293b'); rimGrad.addColorStop(1, '#0f172a');
+        ctx.fillStyle = rimGrad; ctx.fill();
+        ctx.strokeStyle = '#000'; ctx.lineWidth = 4; ctx.stroke();
+
+        ctx.rotate(wheelAngle);
 
         for (let i = 0; i < TOTAL_SEGMENTS; i++) {
             ctx.save(); ctx.rotate(i * SEGMENT_ARC); let value = WHEEL_VALUES[i];
             
-            // Jamaican flag themes used cleanly across alternating panels
-            ctx.fillStyle = value === 1.00 ? varColor('--jamaica-gold') : (i % 2 === 0 ? varColor('--jamaica-green') : '#161920');
-            ctx.beginPath(); ctx.moveTo(0, 0); ctx.arc(0, 0, radius - 5, -SEGMENT_ARC / 2, SEGMENT_ARC / 2); ctx.closePath(); ctx.fill();
+            // Inner gradient giving depth to each panel
+            let segGrad = ctx.createLinearGradient(0, 0, radius, 0);
+            if (value === 1.00) { segGrad.addColorStop(0, '#b38f00'); segGrad.addColorStop(1, varColor('--jamaica-gold')); } 
+            else if (i % 2 === 0) { segGrad.addColorStop(0, '#005921'); segGrad.addColorStop(1, varColor('--jamaica-green')); } 
+            else { segGrad.addColorStop(0, '#111318'); segGrad.addColorStop(1, '#2c313c'); }
             
-            ctx.strokeStyle = 'rgba(255,255,255,0.06)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(radius, -SEGMENT_ARC / 2); ctx.stroke();
+            ctx.fillStyle = segGrad;
+            ctx.beginPath(); ctx.moveTo(0, 0); ctx.arc(0, 0, radius, -SEGMENT_ARC / 2, SEGMENT_ARC / 2); ctx.closePath(); ctx.fill();
             
-            ctx.fillStyle = (value === 1.00) ? '#000' : '#fff'; ctx.font = 'black 26px monospace'; ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
-            ctx.fillText(value === 1.00 ? "1.00" : (value * 100).toFixed(0), radius - 30, 0); ctx.restore();
+            // Harder borders
+            ctx.strokeStyle = '#000'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(radius, -SEGMENT_ARC / 2); ctx.stroke();
+            
+            // Drop shadows for heavy text
+            ctx.fillStyle = (value === 1.00) ? '#000' : '#fff'; 
+            ctx.shadowColor = 'rgba(0,0,0,0.8)'; ctx.shadowBlur = 4; ctx.shadowOffsetX = 2; ctx.shadowOffsetY = 2;
+            if (value === 1.00) { ctx.shadowColor = 'rgba(255,255,255,0.4)'; }
+            ctx.font = '900 30px "Arial Black", sans-serif'; ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+            ctx.fillText(value === 1.00 ? "1.00" : (value * 100).toFixed(0), radius - 45, 0); 
+            ctx.shadowBlur = 0; ctx.shadowOffsetX = 0; ctx.shadowOffsetY = 0; 
+            
+            // Realistic Physical Pegs
+            ctx.beginPath(); ctx.arc(radius, -SEGMENT_ARC / 2, 6, 0, Math.PI*2);
+            let pegGrad = ctx.createRadialGradient(radius-2, (-SEGMENT_ARC / 2)-2, 1, radius, -SEGMENT_ARC / 2, 6);
+            pegGrad.addColorStop(0, '#fff'); pegGrad.addColorStop(1, '#94a3b8');
+            ctx.fillStyle = pegGrad; ctx.fill();
+            ctx.strokeStyle = '#333'; ctx.lineWidth = 1; ctx.stroke();
+
+            ctx.restore();
         }
         ctx.restore(); 
         
-        // Needle Pointer
-        ctx.fillStyle = '#ef4444'; ctx.beginPath(); ctx.moveTo(500, 318); ctx.lineTo(482, 280); ctx.lineTo(518, 280); ctx.closePath(); ctx.fill();
+        // Render Hovering Flapper
+        ctx.shadowColor = 'rgba(0,0,0,0.7)'; ctx.shadowBlur = 10; ctx.shadowOffsetY = 6;
+        ctx.fillStyle = '#ef4444'; ctx.strokeStyle = '#fff'; ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.moveTo(500, 314); ctx.lineTo(480, 260); ctx.lineTo(520, 260); ctx.closePath(); ctx.fill(); ctx.stroke();
+        
+        // Flapper mounting bolt
+        ctx.fillStyle = '#cbd5e1'; ctx.beginPath(); ctx.arc(500, 275, 6, 0, Math.PI*2); ctx.fill();
+        ctx.shadowBlur = 0; ctx.shadowOffsetY = 0; // reset
     }
 
     function renderPlinkoComponent() {
-        // Render Board Pegs
         plinkoPegs.forEach(peg => {
             let isGlowing = activePegGlows.some(g => g.id === peg.id);
             let radGlow = ctx.createRadialGradient(peg.x, peg.y, 1, peg.x, peg.y, peg.radius*2.5);
             radGlow.addColorStop(0, isGlowing ? '#fff' : varColor('--jamaica-gold'));
             radGlow.addColorStop(1, 'rgba(0,0,0,0)');
-            
             ctx.fillStyle = radGlow; ctx.beginPath(); ctx.arc(peg.x, peg.y, peg.radius * 2.5, 0, Math.PI*2); ctx.fill();
             ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(peg.x, peg.y, peg.radius, 0, Math.PI*2); ctx.fill();
         });
-
-        // Slots dividers
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)'; ctx.lineWidth = 4; 
-        for (let i = 1; i < PLINKO_SLOTS.length; i++) { ctx.beginPath(); ctx.moveTo(i * SLOT_WIDTH, 490); ctx.lineTo(i * SLOT_WIDTH, 570); ctx.stroke(); }
-        
-        // Payout text
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)'; ctx.lineWidth = 4; for (let i = 1; i < PLINKO_SLOTS.length; i++) { ctx.beginPath(); ctx.moveTo(i * SLOT_WIDTH, 490); ctx.lineTo(i * SLOT_WIDTH, 570); ctx.stroke(); }
         ctx.font = 'black 18px monospace'; ctx.textAlign = 'center';
-        for (let i = 0; i < PLINKO_SLOTS.length; i++) { 
-            let val = PLINKO_SLOTS[i]; 
-            ctx.fillStyle = val === 10000 ? varColor('--jamaica-gold') : (val === 0 ? '#ef4444' : varColor('--jamaica-green'));
-            ctx.fillText(val === 0 ? "$0" : `$${val.toLocaleString()}`, (i * SLOT_WIDTH) + SLOT_WIDTH/2, 535); 
-        }
-
-        // Active Drops Setup
+        for (let i = 0; i < PLINKO_SLOTS.length; i++) { let val = PLINKO_SLOTS[i]; ctx.fillStyle = val === 10000 ? varColor('--jamaica-gold') : (val === 0 ? '#ef4444' : varColor('--jamaica-green')); ctx.fillText(val === 0 ? "$0" : `$${val.toLocaleString()}`, (i * SLOT_WIDTH) + SLOT_WIDTH/2, 535); }
         plinkoChips.forEach(c => {
             let chGlow = ctx.createRadialGradient(c.x, c.y, 2, c.x, c.y, c.radius);
             chGlow.addColorStop(0, '#ffffff'); chGlow.addColorStop(0.4, varColor('--jamaica-green')); chGlow.addColorStop(1, '#000000');
-            ctx.fillStyle = chGlow; ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; 
-            ctx.beginPath(); ctx.arc(c.x, c.y, c.radius, 0, Math.PI*2); ctx.fill(); ctx.stroke(); 
+            ctx.fillStyle = chGlow; ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(c.x, c.y, c.radius, 0, Math.PI*2); ctx.fill(); ctx.stroke(); 
         });
     }
 
     function renderCliffComponent() {
         ctx.fillStyle = 'rgba(0, 0, 0, 0.7)'; ctx.fillRect(40, 40, 420, 110);
         ctx.strokeStyle = varColor('--jamaica-gold'); ctx.lineWidth = 2; ctx.strokeRect(40, 40, 420, 110);
-        
         ctx.font = '18px sans-serif'; ctx.textAlign = 'left';
         if (cliffItemIndex < CLIFF_ITEMS.length && !cliffGameOver) {
             ctx.fillStyle = varColor('--jamaica-gold'); ctx.fillText(`Target Phase ${cliffItemIndex + 1} of 3:`, 60, 72);
             ctx.fillStyle = '#ffffff'; ctx.font = 'bold 26px sans-serif'; ctx.fillText(CLIFF_ITEMS[cliffItemIndex].name, 60, 110);
         } else {
-            ctx.fillStyle = cliffGameOver && cliffCurrentStep <= 25 ? varColor('--jamaica-green') : '#ef4444';
-            ctx.font = 'bold 32px sans-serif'; ctx.fillText(cliffGameOver && cliffCurrentStep <= 25 ? "SUCCESS CASE" : "FAIL CONDITION", 60, 105);
+            ctx.fillStyle = cliffGameOver && cliffCurrentStep <= 25 ? varColor('--jamaica-green') : '#ef4444'; ctx.font = 'bold 32px sans-serif'; ctx.fillText(cliffGameOver && cliffCurrentStep <= 25 ? "SUCCESS CASE" : "FAIL CONDITION", 60, 105);
         }
-
-        // Mountain Slope Art lines
-        ctx.strokeStyle = '#272935'; ctx.lineWidth = 8; ctx.lineJoin = 'round';
-        ctx.beginPath(); ctx.moveTo(100, 550); ctx.lineTo(800, 150); ctx.lineTo(800, 600); ctx.stroke();
-        
-        ctx.strokeStyle = varColor('--jamaica-green'); ctx.lineWidth = 3;
-        ctx.beginPath(); ctx.moveTo(100, 550); ctx.lineTo(800, 150); ctx.stroke();
-
-        // Increment nodes
+        ctx.strokeStyle = '#272935'; ctx.lineWidth = 8; ctx.lineJoin = 'round'; ctx.beginPath(); ctx.moveTo(100, 550); ctx.lineTo(800, 150); ctx.lineTo(800, 600); ctx.stroke();
+        ctx.strokeStyle = varColor('--jamaica-green'); ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(100, 550); ctx.lineTo(800, 150); ctx.stroke();
         ctx.fillStyle = '#fff'; ctx.font = 'bold 11px monospace'; ctx.textAlign = 'center';
         for (let i = 0; i <= 25; i += 5) {
             let px = 100 + (i * 28); let py = 550 + (i * -16);
-            ctx.beginPath(); ctx.arc(px, py, i===25?6:4, 0, Math.PI*2); 
-            ctx.fillStyle = i===25 ? '#ef4444' : varColor('--jamaica-gold'); ctx.fill();
+            ctx.beginPath(); ctx.arc(px, py, i===25?6:4, 0, Math.PI*2); ctx.fillStyle = i===25 ? '#ef4444' : varColor('--jamaica-gold'); ctx.fill();
             ctx.fillStyle = '#94a3b8'; ctx.fillText(i, px - 15, py + 22);
         }
-
-        // Climber Asset
         ctx.save(); ctx.translate(cliffGuy.x, cliffGuy.y); ctx.rotate(cliffGuy.angle);
         let legSwing = (!cliffGuy.falling && cliffWalking) ? Math.sin(Date.now() / 40) * 12 : 0;
-        ctx.strokeStyle = '#fff'; ctx.lineWidth = 3;
-        ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(-5 + legSwing, 14); ctx.stroke();
-        ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(5 - legSwing, 14); ctx.stroke();
-
+        ctx.strokeStyle = '#fff'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(-5 + legSwing, 14); ctx.stroke(); ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(5 - legSwing, 14); ctx.stroke();
         ctx.fillStyle = varColor('--jamaica-green'); ctx.fillRect(-7, -16, 14, 16);
         ctx.fillStyle = '#fdbaf8'; ctx.beginPath(); ctx.arc(0, -22, 7, 0, Math.PI*2); ctx.fill();
-        ctx.fillStyle = varColor('--jamaica-gold'); ctx.beginPath(); ctx.moveTo(-9, -26); ctx.lineTo(9, -26); ctx.lineTo(0, -38); ctx.fill();
-        ctx.restore();
+        ctx.fillStyle = varColor('--jamaica-gold'); ctx.beginPath(); ctx.moveTo(-9, -26); ctx.lineTo(9, -26); ctx.lineTo(0, -38); ctx.fill(); ctx.restore();
     }
 
     function setupInputTracking() {
-        let handleStart = (y, x) => { 
-            initAudio(); 
-            if (currentMode === 'WHEEL') { isDragging = true; lastMouseY = y; } 
-            else if (currentMode === 'PLINKO') { let r = canvas.getBoundingClientRect(); dropPlinkoChip((x - r.left) * (1000 / r.width)); } 
-        };
+        let handleStart = (y, x) => { initAudio(); if (currentMode === 'WHEEL') { isDragging = true; lastMouseY = y; } else if (currentMode === 'PLINKO') { let r = canvas.getBoundingClientRect(); dropPlinkoChip((x - r.left) * (1000 / r.width)); } };
         let handleMove = (y) => { if (!isDragging || currentMode !== 'WHEEL') return; dragVelocity = (y - lastMouseY) * 0.0025; lastMouseY = y; };
         canvas.addEventListener('mousedown', e => handleStart(e.clientY, e.clientX)); canvas.addEventListener('mousemove', e => handleMove(e.clientY)); window.addEventListener('mouseup', () => isDragging = false);
         canvas.addEventListener('touchstart', e => handleStart(e.touches[0].clientY, e.touches[0].clientX)); canvas.addEventListener('touchmove', e => handleMove(e.touches[0].clientY)); canvas.addEventListener('touchend', () => isDragging = false);
     }
     
-    function logMessage(msg, type) { 
-        let box = document.getElementById('logBox'); if (!box) return; 
-        let entry = document.createElement('div'); entry.className = `log-entry log-${type}`; entry.innerText = msg; 
-        box.appendChild(entry); box.scrollTop = box.scrollHeight; 
-    }
-    
-    function updateWinningsLedger(amount) { 
-        lifetimeWinnings += amount; localStorage.setItem('pir_total_winnings', lifetimeWinnings.toString()); 
-        document.getElementById('winningsDisplay').innerText = `$${lifetimeWinnings.toLocaleString()}`; 
-    }
-    
-    function loadWinningsState() { 
-        lifetimeWinnings = parseInt(localStorage.getItem('pir_total_winnings') || "0"); 
-        document.getElementById('winningsDisplay').innerText = `$${lifetimeWinnings.toLocaleString()}`; 
-    }
+    function logMessage(msg, type) { let box = document.getElementById('logBox'); if (!box) return; let entry = document.createElement('div'); entry.className = `log-entry log-${type}`; entry.innerText = msg; box.appendChild(entry); box.scrollTop = box.scrollHeight; }
+    function updateWinningsLedger(amount) { lifetimeWinnings += amount; localStorage.setItem('pir_total_winnings', lifetimeWinnings.toString()); document.getElementById('winningsDisplay').innerText = `$${lifetimeWinnings.toLocaleString()}`; }
+    function loadWinningsState() { lifetimeWinnings = parseInt(localStorage.getItem('pir_total_winnings') || "0"); document.getElementById('winningsDisplay').innerText = `$${lifetimeWinnings.toLocaleString()}`; }
 </script>
 </body>
 </html>
