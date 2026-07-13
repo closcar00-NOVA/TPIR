@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>The Price is Right - Championship Suite v4.0</title>
+    <title>The Price is Right - Championship Suite v5.0</title>
     <style>
         :root {
             --bg-color: #0b0c10;
@@ -38,7 +38,6 @@
         }
         h3 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.12em; margin-bottom: 12px; color: var(--jamaica-gold); border-bottom: 2px solid rgba(254, 209, 0, 0.2); padding-bottom: 8px; }
         
-        /* New Instructions Box */
         .instructions-box {
             background: rgba(0, 155, 58, 0.1); border-left: 4px solid var(--jamaica-green);
             padding: 12px; font-size: 13px; line-height: 1.5; color: #cbd5e1; border-radius: 4px;
@@ -77,18 +76,17 @@
         <div class="panel">
             <h3>Select Stage</h3>
             <div class="game-selector-grid">
-                <button id="navWheel" class="active-game" onclick="switchGameMode('WHEEL')">The Big Wheel</button>
-                <button id="navPlinko" onclick="switchGameMode('PLINKO')">Plinko Premium</button>
+                <button id="navWheel" onclick="switchGameMode('WHEEL')">The Big Wheel</button>
+                <button id="navPlinko" class="active-game" onclick="switchGameMode('PLINKO')">Plinko Premium</button>
                 <button id="navCliff" onclick="switchGameMode('CLIFF')">Cliff Hangers</button>
             </div>
         </div>
         
         <div class="panel" style="padding: 16px 20px;">
-            <h3 id="panelStatsTitle">Wheel Controls</h3>
+            <h3 id="panelStatsTitle">Plinko Premium Dashboard</h3>
             
-            <!-- Dynamic Instructions Module -->
             <div id="gameInstructions" class="instructions-box">
-                <strong>How to Play:</strong> Click and drag up/down on the wheel, or press Spin. Try to get as close to 1.00 as possible without going over in a maximum of two spins!
+                <strong>How to Play:</strong> Click anywhere inside the game area near the top of the board to drop your chips. Watch them bounce down into the multipliers below!
             </div>
 
             <div style="margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center;">
@@ -97,8 +95,8 @@
             </div>
             
             <div id="interactiveScoreRow" style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 12px;">
-                <div style="font-size: 11px; text-transform: uppercase; color: var(--text-muted); letter-spacing: 0.05em;" id="scoreLabelText">Current Score</div>
-                <div class="stat-val" id="scoreDisplay" style="color: var(--jamaica-gold); font-size: 24px;">0.00</div>
+                <div style="font-size: 11px; text-transform: uppercase; color: var(--text-muted); letter-spacing: 0.05em;" id="scoreLabelText">Available Chips</div>
+                <div class="stat-val" id="scoreDisplay" style="color: var(--jamaica-gold); font-size: 24px;">0</div>
             </div>
             
             <div id="cliffGuessRow" style="display: none; margin-top: 5px;">
@@ -106,7 +104,7 @@
                 <input type="number" id="cliffGuessInput" class="guess-input" placeholder="0" />
             </div>
 
-            <button id="actionBtn" class="main-action-btn" onclick="handleMainAction()">Spin The Wheel!</button>
+            <button id="actionBtn" class="main-action-btn" onclick="handleMainAction()">Claim Pricing Chips</button>
         </div>
 
         <div class="panel" style="flex-grow: 1;"><h3>Production Feed</h3><div class="log-box" id="logBox"></div></div>
@@ -114,10 +112,10 @@
 </div>
 <script>
     let canvas, ctx, audioCtx = null;
-    let currentMode = 'WHEEL', lifetimeWinnings = 0, glowPulseFrame = 0;
+    let currentMode = 'PLINKO', lifetimeWinnings = 0, glowPulseFrame = 0;
     
     let particles = [];
-    let activePegGlows = [];
+    let activePegGlows = new Map(); // Store peg glows with intensities
 
     // --- WHEEL STATE ---
     const WHEEL_VALUES = [0.05, 1.00, 0.15, 0.80, 0.35, 0.70, 0.25, 0.60, 0.45, 0.55, 0.40, 0.65, 0.30, 0.75, 0.20, 0.85, 0.10, 0.95, 0.50, 0.90];
@@ -127,20 +125,19 @@
     // --- PLINKO STATE ---
     let plinkoChips = [], plinkoPegs = [], plinkoRemainingDrops = 0;
     const PLINKO_SLOTS = [100, 500, 1000, 0, 10000, 0, 1000, 500, 100], SLOT_WIDTH = 1000 / PLINKO_SLOTS.length;
+    const CHIP_RESTITUTION = 0.65; // How bouncy the chips are (0 to 1)
 
     // --- CLIFF HANGERS STATE ---
-    const CLIFF_ITEMS = [
-        { name: "Pro Audio System", actualPrice: 149 },
-        { name: "Smart Espresso Maker", actualPrice: 285 },
-        { name: "Designer Leather Jacket", actualPrice: 420 }
-    ];
+    const CLIFF_ITEMS = [ { name: "Pro Audio System", actualPrice: 149 }, { name: "Smart Espresso Maker", actualPrice: 285 }, { name: "Designer Leather Jacket", actualPrice: 420 } ];
     let cliffItemIndex = 0, cliffCurrentStep = 0, cliffTargetStep = 0;
     let cliffGuy = { x: 0, y: 0, vy: 0, angle: 0, falling: false };
     let cliffWalking = false, cliffGameOver = false, lastYodelTime = 0;
 
     window.onload = function() {
         canvas = document.getElementById('studioCanvas'); ctx = canvas.getContext('2d');
-        setupInputTracking(); loadWinningsState(); initBigWheelEngine(); setInterval(studioMainLoop, 1000 / 60);
+        setupInputTracking(); loadWinningsState(); 
+        initPlinkoEngine(); // Start on Plinko
+        setInterval(studioMainLoop, 1000 / 60);
     };
 
     function initAudio() { if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)(); }
@@ -157,9 +154,9 @@
                 osc.start(); osc.stop(audioCtx.currentTime + 0.05);
             }
             else if (type === 'peg') { 
-                osc.type = 'sine'; osc.frequency.setValueAtTime(523.25 + Math.random() * 300, audioCtx.currentTime);
-                gainNode.gain.setValueAtTime(0.25, audioCtx.currentTime); gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.08); 
-                osc.start(); osc.stop(audioCtx.currentTime + 0.08);
+                osc.type = 'sine'; osc.frequency.setValueAtTime(450 + Math.random() * 200, audioCtx.currentTime);
+                gainNode.gain.setValueAtTime(0.4, audioCtx.currentTime); gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1); 
+                osc.start(); osc.stop(audioCtx.currentTime + 0.1);
             }
             else if (type === 'win') { 
                 [440, 554.37, 659.25, 880].forEach((freq, idx) => {
@@ -176,8 +173,7 @@
                 osc.start(); osc.stop(audioCtx.currentTime + 0.12);
             }
             else if (type === 'fall') {
-                osc.type = 'sawtooth'; osc.frequency.setValueAtTime(350, audioCtx.currentTime);
-                osc.frequency.linearRampToValueAtTime(40, audioCtx.currentTime + 1.6);
+                osc.type = 'sawtooth'; osc.frequency.setValueAtTime(350, audioCtx.currentTime); osc.frequency.linearRampToValueAtTime(40, audioCtx.currentTime + 1.6);
                 gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime); gainNode.gain.linearRampToValueAtTime(0.001, audioCtx.currentTime + 1.6);
                 osc.start(); osc.stop(audioCtx.currentTime + 1.6);
             }
@@ -185,8 +181,8 @@
     }
 
     function spawnParticles(x, y, color) {
-        for(let i=0; i<12; i++) {
-            particles.push({ x: x, y: y, vx: (Math.random() - 0.5) * 6, vy: (Math.random() - 0.5) * 6, radius: Math.random() * 4 + 2, alpha: 1, color: color });
+        for(let i=0; i<8; i++) {
+            particles.push({ x: x, y: y, vx: (Math.random() - 0.5) * 8, vy: (Math.random() - 0.5) * 8, radius: Math.random() * 3 + 1, alpha: 1, color: color });
         }
     }
 
@@ -196,9 +192,7 @@
         document.getElementById('navPlinko').className = mode === 'PLINKO' ? 'active-game' : '';
         document.getElementById('navCliff').className = mode === 'CLIFF' ? 'active-game' : '';
         
-        let scoreRow = document.getElementById('interactiveScoreRow');
-        let cliffRow = document.getElementById('cliffGuessRow');
-        let instructions = document.getElementById('gameInstructions');
+        let scoreRow = document.getElementById('interactiveScoreRow'); let cliffRow = document.getElementById('cliffGuessRow'); let instructions = document.getElementById('gameInstructions');
 
         if (mode === 'WHEEL') { 
             document.getElementById('panelStatsTitle').innerText = "Wheel Controls"; document.getElementById('scoreLabelText').innerText = "Current Score"; 
@@ -213,63 +207,51 @@
             scoreRow.style.display = 'flex'; cliffRow.style.display = 'none'; initPlinkoEngine(); 
         }
         else if (mode === 'CLIFF') {
-            document.getElementById('panelStatsTitle').innerText = "Cliff Hangers Terminal"; 
-            document.getElementById('actionBtn').innerText = "Lock In Guess!"; document.getElementById('actionBtn').disabled = false;
+            document.getElementById('panelStatsTitle').innerText = "Cliff Hangers Terminal"; document.getElementById('actionBtn').innerText = "Lock In Guess!"; document.getElementById('actionBtn').disabled = false;
             instructions.innerHTML = "<strong>How to Play:</strong> Guess the EXACT price of the item! For every $1 your guess is wrong, the climber takes 1 step up the mountain. If he takes 25 steps, he falls!";
             scoreRow.style.display = 'none'; cliffRow.style.display = 'block'; initCliffEngine();
         }
     }
 
-    function initBigWheelEngine() { wheelAngle = 0; wheelVelocity = 0; spinCount = 0; wheelTotalScore = 0; document.getElementById('scoreDisplay').innerText = "0.00"; logMessage("Host: Welcome to the Big Wheel stage!", "host"); }
+    function initBigWheelEngine() { wheelAngle = 0; wheelVelocity = 0; spinCount = 0; wheelTotalScore = 0; document.getElementById('scoreDisplay').innerText = "0.00"; }
     
     function initPlinkoEngine() {
         plinkoChips = []; plinkoPegs = []; plinkoRemainingDrops = 0; document.getElementById('scoreDisplay').innerText = "0";
-        activePegGlows = [];
+        activePegGlows.clear();
         for (let row = 0; row < 11; row++) { 
             let pegsInRow = row % 2 === 0 ? 9 : 10, startX = row % 2 === 0 ? 65 : 20; 
             for (let col = 0; col < pegsInRow; col++) { 
-                plinkoPegs.push({ x: startX + (col * 102), y: 110 + (row * 40), radius: 5, id: `p-${row}-${col}` }); 
+                plinkoPegs.push({ x: startX + (col * 102), y: 100 + (row * 40), radius: 6, id: `p-${row}-${col}` }); 
             } 
         }
+        logMessage("Host: Welcome to Plinko! Claim your chips to start.", "host");
     }
     
-    function initCliffEngine() {
-        cliffItemIndex = 0; cliffCurrentStep = 0; cliffTargetStep = 0; cliffWalking = false; cliffGameOver = false;
-        cliffGuy = { x: 100, y: 550, vy: 0, angle: 0, falling: false };
-        document.getElementById('cliffGuessInput').value = "";
-        document.getElementById('actionBtn').disabled = false;
-        logMessage("Host: Let's see if our mountain climber survives the slope!", "host");
-    }
+    function initCliffEngine() { cliffItemIndex = 0; cliffCurrentStep = 0; cliffTargetStep = 0; cliffWalking = false; cliffGameOver = false; cliffGuy = { x: 100, y: 550, vy: 0, angle: 0, falling: false }; document.getElementById('cliffGuessInput').value = ""; document.getElementById('actionBtn').disabled = false; }
 
     function handleMainAction() {
         initAudio();
-        if (currentMode === 'WHEEL' && wheelVelocity === 0) { 
-            wheelVelocity = 0.3 + (Math.random() * 0.25); logMessage("The wheel begins to spin...", "system"); 
-        }
-        else if (currentMode === 'PLINKO') { 
-            plinkoRemainingDrops = 5; document.getElementById('scoreDisplay').innerText = plinkoRemainingDrops; logMessage("Host: 5 Elite Plinko chips distributed!", "host"); 
-        }
+        if (currentMode === 'WHEEL' && wheelVelocity === 0) { wheelVelocity = 0.3 + (Math.random() * 0.25); logMessage("The wheel begins to spin...", "system"); }
+        else if (currentMode === 'PLINKO') { plinkoRemainingDrops = 5; document.getElementById('scoreDisplay').innerText = plinkoRemainingDrops; logMessage("Host: 5 Elite Plinko chips distributed!", "host"); }
         else if (currentMode === 'CLIFF') {
             if(cliffWalking || cliffGameOver) return;
             let guess = parseInt(document.getElementById('cliffGuessInput').value);
             if (isNaN(guess)) { logMessage("Error: Enter a real price prediction.", "fail"); return; }
-            
-            let actual = CLIFF_ITEMS[cliffItemIndex].actualPrice;
-            let diff = Math.abs(guess - actual);
-            
+            let actual = CLIFF_ITEMS[cliffItemIndex].actualPrice; let diff = Math.abs(guess - actual);
             logMessage(`Item Cost: $${actual}. You guessed $${guess}. Off by $${diff}!`, "system");
-            document.getElementById('actionBtn').disabled = true;
-            
-            cliffTargetStep = cliffCurrentStep + diff;
-            cliffWalking = true;
-            document.getElementById('cliffGuessInput').value = '';
+            document.getElementById('actionBtn').disabled = true; cliffTargetStep = cliffCurrentStep + diff; cliffWalking = true; document.getElementById('cliffGuessInput').value = '';
         }
     }
 
     function dropPlinkoChip(clickX) {
         if (plinkoRemainingDrops <= 0) return;
         plinkoRemainingDrops--; document.getElementById('scoreDisplay').innerText = plinkoRemainingDrops;
-        plinkoChips.push({ x: Math.max(45, Math.min(955, clickX)), y: 45, vx: (Math.random() - 0.5) * 3, vy: 1, radius: 14 }); playSound('click');
+        plinkoChips.push({ 
+            x: Math.max(45, Math.min(955, clickX)), y: 45, 
+            vx: (Math.random() - 0.5) * 2, vy: 1, 
+            radius: 14, trail: [], rotation: 0 
+        }); 
+        playSound('click');
     }
 
     function processWheelPhysics() {
@@ -278,27 +260,77 @@
     }
 
     function processPlinkoPhysics() {
-        activePegGlows = activePegGlows.filter(g => { g.frames--; return g.frames > 0; });
+        // Fade out peg glows
+        for (let [id, intensity] of activePegGlows) {
+            if (intensity <= 0.05) activePegGlows.delete(id);
+            else activePegGlows.set(id, intensity * 0.9);
+        }
+
         for (let i = plinkoChips.length - 1; i >= 0; i--) {
-            let c = plinkoChips[i]; c.vy += 0.42; c.x += c.vx; c.y += c.vy;
-            if (c.x < 20 || c.x > 980) { c.vx *= -0.7; c.x = c.x < 20 ? 20 : 980; }
+            let c = plinkoChips[i]; 
             
+            // Apply forces
+            c.vy += 0.35; // Gravity
+            c.vy *= 0.995; // Air resistance
+            c.vx *= 0.995;
+            
+            c.x += c.vx; c.y += c.vy;
+            c.rotation += c.vx * 0.1; // Spin based on horizontal velocity
+
+            // Store trail history
+            c.trail.unshift({x: c.x, y: c.y});
+            if (c.trail.length > 7) c.trail.pop();
+
+            // Wall collisions
+            if (c.x < 20 || c.x > 980) { 
+                c.vx *= -CHIP_RESTITUTION; 
+                c.x = c.x < 20 ? 20 : 980; 
+            }
+            
+            // True Circle Collision Mathematics
             plinkoPegs.forEach(peg => {
-                let dx = c.x - peg.x, dy = c.y - peg.y, dist = Math.sqrt(dx*dx + dy*dy);
-                if (dist < c.radius + peg.radius) {
-                    playSound('peg'); activePegGlows.push({ id: peg.id, frames: 15 });
+                let dx = c.x - peg.x;
+                let dy = c.y - peg.y;
+                let dist = Math.sqrt(dx*dx + dy*dy);
+                let minDist = c.radius + peg.radius;
+                
+                if (dist < minDist) {
+                    playSound('peg'); 
+                    activePegGlows.set(peg.id, 1.0); // Full intensity glow
                     spawnParticles(peg.x, peg.y, varColor('--jamaica-gold'));
-                    let angle = Math.atan2(dy, dx);
-                    c.x = peg.x + Math.cos(angle) * (c.radius + peg.radius + 1); 
-                    c.y = peg.y + Math.sin(angle) * (c.radius + peg.radius + 1);
-                    let speed = Math.sqrt(c.vx*c.vx + c.vy*c.vy); 
-                    c.vx = Math.cos(angle) * speed * 0.72 + (Math.random() - 0.5) * 2; 
-                    c.vy = Math.sin(angle) * speed * 0.55;
+                    
+                    // Normalize collision vector
+                    let nx = dx / dist;
+                    let ny = dy / dist;
+                    
+                    // Push chip out to prevent sticking
+                    c.x = peg.x + nx * minDist;
+                    c.y = peg.y + ny * minDist;
+                    
+                    // Calculate relative velocity
+                    let dotProduct = (c.vx * nx + c.vy * ny);
+                    
+                    // Apply bounce (restitution)
+                    if (dotProduct < 0) {
+                        c.vx -= (1 + CHIP_RESTITUTION) * dotProduct * nx;
+                        c.vy -= (1 + CHIP_RESTITUTION) * dotProduct * ny;
+                    }
+
+                    // Add chaotic spin factor upon hitting the peg
+                    c.vx += (Math.random() - 0.5) * 1.5;
                 }
             });
+
+            // Reached the bottom slots
             if (c.y > 545) {
-                let slotIdx = Math.max(0, Math.min(PLINKO_SLOTS.length - 1, Math.floor(c.x / SLOT_WIDTH))), prize = PLINKO_SLOTS[slotIdx];
-                if (prize > 0) { logMessage(`BOOM! LANDED IN $${prize.toLocaleString()}!`, "win"); playSound('win'); updateWinningsLedger(prize); spawnParticles(c.x, c.y, varColor('--jamaica-green')); } else { logMessage("Bummer, $0 entry point hit.", "fail"); }
+                let slotIdx = Math.max(0, Math.min(PLINKO_SLOTS.length - 1, Math.floor(c.x / SLOT_WIDTH)));
+                let prize = PLINKO_SLOTS[slotIdx];
+                if (prize > 0) { 
+                    logMessage(`BOOM! LANDED IN $${prize.toLocaleString()}!`, "win"); playSound('win'); 
+                    updateWinningsLedger(prize); spawnParticles(c.x, c.y, varColor('--jamaica-green')); 
+                } else { 
+                    logMessage("Bummer, $0 entry point hit.", "fail"); 
+                }
                 plinkoChips.splice(i, 1);
             }
         }
@@ -307,18 +339,10 @@
     function processCliffPhysics() {
         if (!cliffWalking) return;
         if (!cliffGuy.falling) {
-            cliffCurrentStep += 0.08; 
-            cliffGuy.x = 100 + (cliffCurrentStep * 28);
-            cliffGuy.y = 550 + (cliffCurrentStep * -16);
-
-            let now = Date.now();
-            if (now - lastYodelTime > 220) { playSound(Math.floor(cliffCurrentStep) % 2 === 0 ? 'yodel_high' : 'yodel_low'); lastYodelTime = now; }
-
+            cliffCurrentStep += 0.08; cliffGuy.x = 100 + (cliffCurrentStep * 28); cliffGuy.y = 550 + (cliffCurrentStep * -16);
+            let now = Date.now(); if (now - lastYodelTime > 220) { playSound(Math.floor(cliffCurrentStep) % 2 === 0 ? 'yodel_high' : 'yodel_low'); lastYodelTime = now; }
             if (cliffCurrentStep >= cliffTargetStep) {
-                cliffCurrentStep = cliffTargetStep;
-                cliffGuy.x = 100 + (cliffCurrentStep * 28); cliffGuy.y = 550 + (cliffCurrentStep * -16);
-                cliffWalking = false;
-
+                cliffCurrentStep = cliffTargetStep; cliffGuy.x = 100 + (cliffCurrentStep * 28); cliffGuy.y = 550 + (cliffCurrentStep * -16); cliffWalking = false;
                 if (cliffCurrentStep <= 25) {
                     cliffItemIndex++;
                     if (cliffItemIndex >= CLIFF_ITEMS.length) { logMessage("JACKPOT! You protected the climber! $25k Bonus!", "win"); updateWinningsLedger(25000); playSound('win'); cliffGameOver = true; } else { document.getElementById('actionBtn').disabled = false; }
@@ -334,8 +358,7 @@
     function resolveFinalWheelScore() {
         let normalized = (wheelAngle % (Math.PI * 2)); if (normalized < 0) normalized += (Math.PI * 2);
         let exactIndex = Math.floor((Math.PI * 1.5 - normalized) / SEGMENT_ARC) % TOTAL_SEGMENTS; if (exactIndex < 0) exactIndex += TOTAL_SEGMENTS;
-        let spinValue = WHEEL_VALUES[exactIndex]; spinCount++; wheelTotalScore += spinValue;
-        document.getElementById('scoreDisplay').innerText = wheelTotalScore.toFixed(2);
+        let spinValue = WHEEL_VALUES[exactIndex]; spinCount++; wheelTotalScore += spinValue; document.getElementById('scoreDisplay').innerText = wheelTotalScore.toFixed(2);
         if (wheelTotalScore === 1.00) { logMessage("PERFECTION! Mega $10,000 Payout!", "win"); playSound('win'); updateWinningsLedger(10000); spinCount = 0; wheelTotalScore = 0; }
         else if (wheelTotalScore > 1.00) { logMessage(`Score of $${wheelTotalScore.toFixed(2)} Exceeded 1.00. BUSTED!`, "fail"); spinCount = 0; wheelTotalScore = 0; }
         else { if (spinCount === 1) { logMessage("Host: Stand on your current values, or risk another spin?", "host"); } else { logMessage(`Final combined evaluation score: $${wheelTotalScore.toFixed(2)}!`, "win"); updateWinningsLedger(wheelTotalScore * 1000); spinCount = 0; wheelTotalScore = 0; } }
@@ -346,7 +369,7 @@
     function studioMainLoop() { 
         glowPulseFrame += 0.06; 
         if (currentMode === 'WHEEL') processWheelPhysics(); else if (currentMode === 'PLINKO') processPlinkoPhysics(); else if (currentMode === 'CLIFF') processCliffPhysics();
-        particles.forEach((p, idx) => { p.x += p.vx; p.y += p.vy; p.alpha -= 0.02; if(p.alpha <= 0) particles.splice(idx, 1); });
+        particles.forEach((p, idx) => { p.x += p.vx; p.y += p.vy; p.alpha -= 0.03; if(p.alpha <= 0) particles.splice(idx, 1); });
         renderStudioGraphics(); 
     }
 
@@ -362,82 +385,110 @@
         else if (currentMode === 'PLINKO') renderPlinkoComponent();
         else if (currentMode === 'CLIFF') renderCliffComponent();
 
-        particles.forEach(p => { ctx.save(); ctx.globalAlpha = p.alpha; ctx.fillStyle = p.color; ctx.beginPath(); ctx.arc(p.x, p.y, p.radius, 0, Math.PI*2); ctx.fill(); ctx.restore(); });
+        // Draw active particles
+        particles.forEach(p => { 
+            ctx.save(); ctx.globalAlpha = p.alpha; ctx.fillStyle = p.color; 
+            ctx.beginPath(); ctx.arc(p.x, p.y, p.radius, 0, Math.PI*2); ctx.fill(); 
+            ctx.restore(); 
+        });
     }
 
     function renderBigWheelComponent() {
-        let center = { x: 500, y: 760 }, radius = 430; 
-        ctx.save(); ctx.translate(center.x, center.y); 
-        
-        // Realistic Background Rim 
+        let center = { x: 500, y: 760 }, radius = 430; ctx.save(); ctx.translate(center.x, center.y); 
         ctx.beginPath(); ctx.arc(0, 0, radius + 15, 0, Math.PI * 2);
-        let rimGrad = ctx.createLinearGradient(-radius, -radius, radius, radius);
-        rimGrad.addColorStop(0, '#475569'); rimGrad.addColorStop(0.5, '#1e293b'); rimGrad.addColorStop(1, '#0f172a');
-        ctx.fillStyle = rimGrad; ctx.fill();
-        ctx.strokeStyle = '#000'; ctx.lineWidth = 4; ctx.stroke();
-
+        let rimGrad = ctx.createLinearGradient(-radius, -radius, radius, radius); rimGrad.addColorStop(0, '#475569'); rimGrad.addColorStop(0.5, '#1e293b'); rimGrad.addColorStop(1, '#0f172a');
+        ctx.fillStyle = rimGrad; ctx.fill(); ctx.strokeStyle = '#000'; ctx.lineWidth = 4; ctx.stroke();
         ctx.rotate(wheelAngle);
 
         for (let i = 0; i < TOTAL_SEGMENTS; i++) {
             ctx.save(); ctx.rotate(i * SEGMENT_ARC); let value = WHEEL_VALUES[i];
-            
-            // Inner gradient giving depth to each panel
             let segGrad = ctx.createLinearGradient(0, 0, radius, 0);
-            if (value === 1.00) { segGrad.addColorStop(0, '#b38f00'); segGrad.addColorStop(1, varColor('--jamaica-gold')); } 
-            else if (i % 2 === 0) { segGrad.addColorStop(0, '#005921'); segGrad.addColorStop(1, varColor('--jamaica-green')); } 
-            else { segGrad.addColorStop(0, '#111318'); segGrad.addColorStop(1, '#2c313c'); }
-            
-            ctx.fillStyle = segGrad;
-            ctx.beginPath(); ctx.moveTo(0, 0); ctx.arc(0, 0, radius, -SEGMENT_ARC / 2, SEGMENT_ARC / 2); ctx.closePath(); ctx.fill();
-            
-            // Harder borders
+            if (value === 1.00) { segGrad.addColorStop(0, '#b38f00'); segGrad.addColorStop(1, varColor('--jamaica-gold')); } else if (i % 2 === 0) { segGrad.addColorStop(0, '#005921'); segGrad.addColorStop(1, varColor('--jamaica-green')); } else { segGrad.addColorStop(0, '#111318'); segGrad.addColorStop(1, '#2c313c'); }
+            ctx.fillStyle = segGrad; ctx.beginPath(); ctx.moveTo(0, 0); ctx.arc(0, 0, radius, -SEGMENT_ARC / 2, SEGMENT_ARC / 2); ctx.closePath(); ctx.fill();
             ctx.strokeStyle = '#000'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(radius, -SEGMENT_ARC / 2); ctx.stroke();
-            
-            // Drop shadows for heavy text
-            ctx.fillStyle = (value === 1.00) ? '#000' : '#fff'; 
-            ctx.shadowColor = 'rgba(0,0,0,0.8)'; ctx.shadowBlur = 4; ctx.shadowOffsetX = 2; ctx.shadowOffsetY = 2;
+            ctx.fillStyle = (value === 1.00) ? '#000' : '#fff'; ctx.shadowColor = 'rgba(0,0,0,0.8)'; ctx.shadowBlur = 4; ctx.shadowOffsetX = 2; ctx.shadowOffsetY = 2;
             if (value === 1.00) { ctx.shadowColor = 'rgba(255,255,255,0.4)'; }
-            ctx.font = '900 30px "Arial Black", sans-serif'; ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
-            ctx.fillText(value === 1.00 ? "1.00" : (value * 100).toFixed(0), radius - 45, 0); 
+            ctx.font = '900 30px "Arial Black", sans-serif'; ctx.textAlign = 'right'; ctx.textBaseline = 'middle'; ctx.fillText(value === 1.00 ? "1.00" : (value * 100).toFixed(0), radius - 45, 0); 
             ctx.shadowBlur = 0; ctx.shadowOffsetX = 0; ctx.shadowOffsetY = 0; 
-            
-            // Realistic Physical Pegs
             ctx.beginPath(); ctx.arc(radius, -SEGMENT_ARC / 2, 6, 0, Math.PI*2);
-            let pegGrad = ctx.createRadialGradient(radius-2, (-SEGMENT_ARC / 2)-2, 1, radius, -SEGMENT_ARC / 2, 6);
-            pegGrad.addColorStop(0, '#fff'); pegGrad.addColorStop(1, '#94a3b8');
-            ctx.fillStyle = pegGrad; ctx.fill();
-            ctx.strokeStyle = '#333'; ctx.lineWidth = 1; ctx.stroke();
-
+            let pegGrad = ctx.createRadialGradient(radius-2, (-SEGMENT_ARC / 2)-2, 1, radius, -SEGMENT_ARC / 2, 6); pegGrad.addColorStop(0, '#fff'); pegGrad.addColorStop(1, '#94a3b8'); ctx.fillStyle = pegGrad; ctx.fill(); ctx.strokeStyle = '#333'; ctx.lineWidth = 1; ctx.stroke();
             ctx.restore();
         }
         ctx.restore(); 
-        
-        // Render Hovering Flapper
-        ctx.shadowColor = 'rgba(0,0,0,0.7)'; ctx.shadowBlur = 10; ctx.shadowOffsetY = 6;
-        ctx.fillStyle = '#ef4444'; ctx.strokeStyle = '#fff'; ctx.lineWidth = 3;
-        ctx.beginPath(); ctx.moveTo(500, 314); ctx.lineTo(480, 260); ctx.lineTo(520, 260); ctx.closePath(); ctx.fill(); ctx.stroke();
-        
-        // Flapper mounting bolt
-        ctx.fillStyle = '#cbd5e1'; ctx.beginPath(); ctx.arc(500, 275, 6, 0, Math.PI*2); ctx.fill();
-        ctx.shadowBlur = 0; ctx.shadowOffsetY = 0; // reset
+        ctx.shadowColor = 'rgba(0,0,0,0.7)'; ctx.shadowBlur = 10; ctx.shadowOffsetY = 6; ctx.fillStyle = '#ef4444'; ctx.strokeStyle = '#fff'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(500, 314); ctx.lineTo(480, 260); ctx.lineTo(520, 260); ctx.closePath(); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = '#cbd5e1'; ctx.beginPath(); ctx.arc(500, 275, 6, 0, Math.PI*2); ctx.fill(); ctx.shadowBlur = 0; ctx.shadowOffsetY = 0; 
     }
 
     function renderPlinkoComponent() {
+        // Render 3D Pegs
         plinkoPegs.forEach(peg => {
-            let isGlowing = activePegGlows.some(g => g.id === peg.id);
-            let radGlow = ctx.createRadialGradient(peg.x, peg.y, 1, peg.x, peg.y, peg.radius*2.5);
-            radGlow.addColorStop(0, isGlowing ? '#fff' : varColor('--jamaica-gold'));
-            radGlow.addColorStop(1, 'rgba(0,0,0,0)');
-            ctx.fillStyle = radGlow; ctx.beginPath(); ctx.arc(peg.x, peg.y, peg.radius * 2.5, 0, Math.PI*2); ctx.fill();
-            ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(peg.x, peg.y, peg.radius, 0, Math.PI*2); ctx.fill();
+            let intensity = activePegGlows.get(peg.id) || 0;
+            
+            // Dynamic Impact Glow
+            if (intensity > 0) {
+                let glowGrad = ctx.createRadialGradient(peg.x, peg.y, peg.radius, peg.x, peg.y, peg.radius * 4);
+                glowGrad.addColorStop(0, `rgba(254, 209, 0, ${intensity})`);
+                glowGrad.addColorStop(1, 'rgba(254, 209, 0, 0)');
+                ctx.fillStyle = glowGrad; ctx.beginPath(); ctx.arc(peg.x, peg.y, peg.radius * 4, 0, Math.PI*2); ctx.fill();
+            }
+
+            // Metallic Peg Base
+            let pegGrad = ctx.createRadialGradient(peg.x - 2, peg.y - 2, 1, peg.x, peg.y, peg.radius);
+            pegGrad.addColorStop(0, '#e2e8f0'); pegGrad.addColorStop(0.5, '#475569'); pegGrad.addColorStop(1, '#0f172a');
+            ctx.fillStyle = pegGrad; ctx.beginPath(); ctx.arc(peg.x, peg.y, peg.radius, 0, Math.PI*2); ctx.fill();
+            
+            // Peg standby light
+            ctx.fillStyle = `rgba(254, 209, 0, ${0.2 + intensity})`;
+            ctx.beginPath(); ctx.arc(peg.x, peg.y, 2, 0, Math.PI*2); ctx.fill();
         });
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)'; ctx.lineWidth = 4; for (let i = 1; i < PLINKO_SLOTS.length; i++) { ctx.beginPath(); ctx.moveTo(i * SLOT_WIDTH, 490); ctx.lineTo(i * SLOT_WIDTH, 570); ctx.stroke(); }
-        ctx.font = 'black 18px monospace'; ctx.textAlign = 'center';
-        for (let i = 0; i < PLINKO_SLOTS.length; i++) { let val = PLINKO_SLOTS[i]; ctx.fillStyle = val === 10000 ? varColor('--jamaica-gold') : (val === 0 ? '#ef4444' : varColor('--jamaica-green')); ctx.fillText(val === 0 ? "$0" : `$${val.toLocaleString()}`, (i * SLOT_WIDTH) + SLOT_WIDTH/2, 535); }
+
+        // Glowing Laser Slots
+        for (let i = 1; i < PLINKO_SLOTS.length; i++) { 
+            ctx.shadowColor = 'var(--jamaica-gold)'; ctx.shadowBlur = 10;
+            ctx.strokeStyle = 'rgba(254, 209, 0, 0.4)'; ctx.lineWidth = 4; 
+            ctx.beginPath(); ctx.moveTo(i * SLOT_WIDTH, 480); ctx.lineTo(i * SLOT_WIDTH, 580); ctx.stroke(); 
+            ctx.shadowBlur = 0;
+        }
+
+        // Payout text
+        ctx.font = '900 18px monospace'; ctx.textAlign = 'center';
+        for (let i = 0; i < PLINKO_SLOTS.length; i++) { 
+            let val = PLINKO_SLOTS[i]; 
+            ctx.fillStyle = val === 10000 ? varColor('--jamaica-gold') : (val === 0 ? '#ef4444' : varColor('--jamaica-green')); 
+            ctx.fillText(val === 0 ? "$0" : `$${val.toLocaleString()}`, (i * SLOT_WIDTH) + SLOT_WIDTH/2, 535); 
+        }
+
+        // Render Motion Trails & Chips
         plinkoChips.forEach(c => {
-            let chGlow = ctx.createRadialGradient(c.x, c.y, 2, c.x, c.y, c.radius);
-            chGlow.addColorStop(0, '#ffffff'); chGlow.addColorStop(0.4, varColor('--jamaica-green')); chGlow.addColorStop(1, '#000000');
-            ctx.fillStyle = chGlow; ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(c.x, c.y, c.radius, 0, Math.PI*2); ctx.fill(); ctx.stroke(); 
+            // Draw Trail
+            if (c.trail.length > 1) {
+                ctx.beginPath();
+                ctx.moveTo(c.trail[0].x, c.trail[0].y);
+                for (let j = 1; j < c.trail.length; j++) { ctx.lineTo(c.trail[j].x, c.trail[j].y); }
+                ctx.strokeStyle = 'rgba(254, 209, 0, 0.3)';
+                ctx.lineWidth = c.radius;
+                ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+                ctx.stroke();
+            }
+
+            // Draw Metallic Chip
+            ctx.save();
+            ctx.translate(c.x, c.y); ctx.rotate(c.rotation);
+
+            // Outer ring
+            let chipGrad = ctx.createLinearGradient(-c.radius, -c.radius, c.radius, c.radius);
+            chipGrad.addColorStop(0, '#fcd34d'); chipGrad.addColorStop(0.5, '#b45309'); chipGrad.addColorStop(1, '#78350f');
+            ctx.fillStyle = chipGrad; ctx.beginPath(); ctx.arc(0, 0, c.radius, 0, Math.PI*2); ctx.fill();
+            
+            // Inner gold insert
+            ctx.fillStyle = varColor('--jamaica-gold');
+            ctx.beginPath(); ctx.arc(0, 0, c.radius - 3, 0, Math.PI*2); ctx.fill();
+            
+            // Specular highlight representing spin
+            ctx.fillStyle = 'rgba(255,255,255,0.6)';
+            ctx.beginPath(); ctx.ellipse(-c.radius*0.3, -c.radius*0.3, 4, 8, Math.PI/4, 0, Math.PI*2); ctx.fill();
+
+            ctx.restore();
         });
     }
 
